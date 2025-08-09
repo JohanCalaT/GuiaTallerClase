@@ -8,15 +8,10 @@ namespace DevWorkshop.TaskAPI.Application.DTOs.Roles;
 public class CreateRoleDto
 {
     /// <summary>
-    /// Nombre del rol
+    /// Nombre del rol a crear
     /// </summary>
     [Required(ErrorMessage = "El nombre del rol es obligatorio")]
-    [StringLength(50, ErrorMessage = "El nombre del rol no puede exceder 50 caracteres")]
+    [StringLength(100, MinimumLength = 2, ErrorMessage = "El nombre del rol debe tener entre 2 y 100 caracteres")]
+    [RegularExpression(@"^[a-zA-ZÀ-ÿ\u00f1\u00d1\s]+$", ErrorMessage = "El nombre del rol solo puede contener letras y espacios")]
     public string RoleName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Descripción del rol
-    /// </summary>
-    [StringLength(200, ErrorMessage = "La descripción no puede exceder 200 caracteres")]
-    public string? Description { get; set; }
 }

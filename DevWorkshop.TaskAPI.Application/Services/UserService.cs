@@ -1,5 +1,7 @@
+using AutoMapper;
 using DevWorkshop.TaskAPI.Application.DTOs.Users;
 using DevWorkshop.TaskAPI.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace DevWorkshop.TaskAPI.Application.Services;
 
@@ -9,7 +11,11 @@ namespace DevWorkshop.TaskAPI.Application.Services;
 public class UserService : IUserService
 {
     // TODO: ESTUDIANTE - Inyectar dependencias necesarias (DbContext, AutoMapper, Logger)
-    
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IMapper _mapper;
+    private readonly ILogger<RoleService> _logger;
+
+
     public UserService()
     {
         // TODO: ESTUDIANTE - Configurar las dependencias inyectadas

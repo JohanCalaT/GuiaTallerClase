@@ -182,56 +182,73 @@ public class RolesController : ControllerBase
     }
 
     /// <summary>
-    /// TODO: ESTUDIANTE - Crear un nuevo rol
+    /// Crear un nuevo rol
     ///
-    /// Este endpoint debe:
-    /// 1. Validar el modelo de entrada
-    /// 2. Verificar que el nombre del rol no exista
-    /// 3. Crear el rol usando el servicio
-    /// 4. Retornar el rol creado con código 201
-    ///
-    /// Ejemplo de implementación:
-    /// - Usar [HttpPost]
-    /// - Validar ModelState
-    /// - Llamar _roleService.CreateRoleAsync()
-    /// - Retornar CreatedAtAction con el rol creado
+    /// Este endpoint permite crear nuevos roles en el sistema.
+    /// Valida que el nombre del rol sea único antes de crearlo.
     /// </summary>
     /// <param name="createRoleDto">Datos del rol a crear</param>
-    /// <returns>Rol creado</returns>
+    /// <returns>Rol creado con código 201</returns>
     [HttpPost("create")]
     [ProducesResponseType(typeof(ApiResponse<RoleDto>), 201)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
+    [ProducesResponseType(typeof(ApiResponse<object>), 409)] // Conflict para nombres duplicados
     [ProducesResponseType(typeof(ApiResponse<object>), 500)]
     public async Task<ActionResult<ApiResponse<RoleDto>>> CreateRole([FromBody] CreateRoleDto createRoleDto)
     {
-        // TODO: ESTUDIANTE - Implementar creación de rol
-        // Ejemplo de estructura:
-        /*
         try
         {
+            // Validar el modelo de entrada
             if (!ModelState.IsValid)
             {
-                return BadRequest(ApiResponse<RoleDto>.ErrorResponse("Datos inválidos", ModelState));
+                _logger.LogWarning("Intento de crear rol con datos inválidos: {Errors}",
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+
+                return BadRequest(ApiResponse<RoleDto>.ErrorResponse(
+                    "Datos de entrada inválidos",
+                    ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)).ToList()
+                ));
             }
 
+            // Crear el rol usando el servicio
             var role = await _roleService.CreateRoleAsync(createRoleDto);
-            var response = ApiResponse<RoleDto>.SuccessResponse(role, "Rol creado correctamente");
 
-            return CreatedAtAction(nameof(GetRoleById), new { id = role.RoleId }, response);
+            // Crear respuesta exitosa
+            var response = ApiResponse<RoleDto>.SuccessResponse(
+                role,
+                "Rol creado correctamente"
+            );
+
+            _logger.LogInformation("Rol creado exitosamente: {RoleName} con ID: {RoleId}",
+                role.RoleName, role.RoleId);
+
+            // Retornar 201 Created con la ubicación del recurso creado
+            return CreatedAtAction(
+                nameof(GetRoleById),
+                new { id = role.RoleId },
+                response
+            );
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Ya existe un rol"))
+        {
+            // Manejar conflicto de nombres duplicados
+            _logger.LogWarning("Conflicto al crear rol: {Message}", ex.Message);
+
+            return Conflict(ApiResponse<RoleDto>.ErrorResponse(
+                "Conflicto de datos",
+                ex.Message
+            ));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al crear rol");
-            return StatusCode(500, ApiResponse<RoleDto>.ErrorResponse("Error interno"));
+            _logger.LogError(ex, "Error interno al crear rol: {RoleName}", createRoleDto?.RoleName ?? "Unknown");
+
+            return StatusCode(500, ApiResponse<RoleDto>.ErrorResponse(
+                "Error interno del servidor",
+                "Ocurrió un error inesperado al crear el rol"
+            ));
         }
-        */
-
-        return StatusCode(501, ApiResponse<RoleDto>.ErrorResponse(
-            "Método no implementado",
-            "Este endpoint debe ser implementado por el estudiante"
-        ));
     }
-
     /// <summary>
     /// TODO: ESTUDIANTE - Actualizar un rol existente
     ///

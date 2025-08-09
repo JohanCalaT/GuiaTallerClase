@@ -1,6 +1,7 @@
 using AutoMapper;
 using DevWorkshop.TaskAPI.Application.DTOs.Roles;
 using DevWorkshop.TaskAPI.Application.Interfaces;
+using DevWorkshop.TaskAPI.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace DevWorkshop.TaskAPI.Application.Services;
@@ -107,19 +108,65 @@ public class RoleService : IRoleService
     }
 
     /// <summary>
-    /// TODO: ESTUDIANTE - Implementar creación de rol
+    /// Crea un nuevo rol
     /// 
-    /// Pasos a seguir:
-    /// 1. Validar que el nombre del rol no exista
-    /// 2. Crear nueva entidad Role
-    /// 3. Usar _unitOfWork.Roles.AddAsync()
-    /// 4. Llamar _unitOfWork.SaveChangesAsync()
-    /// 5. Mapear y retornar RoleDto
+    /// Este método implementa la creación de roles siguiendo las mejores prácticas:
+    /// 1. Validación de duplicados
+    /// 2. Creación de la entidad
+    /// 3. Persistencia en base de datos
+    /// 4. Mapeo a DTO de respuesta
     /// </summary>
     public async Task<RoleDto> CreateRoleAsync(CreateRoleDto createRoleDto)
     {
-        // TODO: ESTUDIANTE - Implementar
-        throw new NotImplementedException("Método pendiente de implementación por el estudiante");
+        try
+        {
+            _logger.LogInformation("Creando nuevo rol: {RoleName}", createRoleDto.RoleName);
+
+            // 1. Validar que el nombre del rol no exista
+            var existingRole = await _unitOfWork.Roles.FirstOrDefaultAsync(r => r.RoleName.ToLower() == createRoleDto.RoleName.ToLower());
+
+            if (existingRole != null)
+            {
+                _logger.LogWarning("Intento de crear rol duplicado: {RoleName}", createRoleDto.RoleName);
+                throw new InvalidOperationException($"Ya existe un rol con el nombre '{createRoleDto.RoleName}'");
+            }
+
+            // 2. Crear nueva entidad Role
+            var role = new Role
+            {
+                RoleName = createRoleDto.RoleName.Trim()
+            };
+
+            // 3. Agregar el rol al repositorio
+            await _unitOfWork.Roles.AddAsync(role);
+
+            // 4. Guardar cambios en la base de datos
+            await _unitOfWork.SaveChangesAsync();
+
+            // 5. Mapear y retornar RoleDto
+            var roleDto = new RoleDto
+            {
+                RoleId = role.RoleId,
+                RoleName = role.RoleName,
+                Description = $"Rol {role.RoleName}",
+                IsActive = true, // Por defecto todos los roles están activos
+                CreatedAt = DateTime.UtcNow,
+                UserCount = 0 // Nuevo rol, sin usuarios asignados
+            };
+
+            _logger.LogInformation("Rol creado exitosamente con ID: {RoleId}", role.RoleId);
+            return roleDto;
+        }
+        catch (InvalidOperationException)
+        {
+            // Re-lanzar excepciones de validación de negocio
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al crear el rol: {RoleName}", createRoleDto.RoleName);
+            throw;
+        }
     }
 
     /// <summary>
@@ -136,6 +183,7 @@ public class RoleService : IRoleService
     public async Task<RoleDto?> UpdateRoleAsync(int roleId, UpdateRoleDto updateRoleDto)
     {
         // TODO: ESTUDIANTE - Implementar
+        var role = await _unitOfWork.Roles.GetByIdAsync(roleId);
         throw new NotImplementedException("Método pendiente de implementación por el estudiante");
     }
 
