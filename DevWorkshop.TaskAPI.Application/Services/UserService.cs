@@ -1,7 +1,9 @@
 using AutoMapper;
 using DevWorkshop.TaskAPI.Application.DTOs.Users;
 using DevWorkshop.TaskAPI.Application.Interfaces;
+using DevWorkshop.TaskAPI.Domain.Entities;
 using Microsoft.Extensions.Logging;
+using BCrypt.Net;
 
 namespace DevWorkshop.TaskAPI.Application.Services;
 
@@ -10,15 +12,15 @@ namespace DevWorkshop.TaskAPI.Application.Services;
 /// </summary>
 public class UserService : IUserService
 {
-    // TODO: ESTUDIANTE - Inyectar dependencias necesarias (DbContext, AutoMapper, Logger)
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
-    private readonly ILogger<RoleService> _logger;
+    private readonly ILogger<UserService> _logger;
 
-
-    public UserService()
+    public UserService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<UserService> logger)
     {
-        // TODO: ESTUDIANTE - Configurar las dependencias inyectadas
+        _unitOfWork = unitOfWork;
+        _mapper = mapper;
+        _logger = logger;
     }
 
     /// <summary>
@@ -68,22 +70,58 @@ public class UserService : IUserService
     }
 
     /// <summary>
-    /// TODO: ESTUDIANTE - Implementar la creación de un nuevo usuario
-    /// 
-    /// Pasos a seguir:
+    /// Implementa la creación de un nuevo usuario
+    ///
+    /// Pasos implementados:
     /// 1. Validar que el email no esté en uso
     /// 2. Hashear la contraseña usando BCrypt
     /// 3. Crear una nueva entidad User con los datos del DTO
-    /// 4. Establecer CreatedAt = DateTime.UtcNow e IsActive = true
+    /// 4. Establecer CreatedAt = DateTime.UtcNow
     /// 5. Guardar en la base de datos
     /// 6. Mapear la entidad creada a UserDto y retornar
     /// </summary>
     public async Task<UserDto> CreateUserAsync(CreateUserDto createUserDto)
     {
-        // TODO: ESTUDIANTE - Implementar lógica
-        throw new NotImplementedException("Método pendiente de implementación por el estudiante");
-    }
+        try
+        {
+            _logger.LogInformation("Iniciando creación de usuario con email: {Email}", createUserDto.Email);
 
+            // 1. Validar que el email no esté en uso (ya se hace en el controlador, pero doble verificación)
+            var normalizedEmail = createUserDto.Email.Trim().ToLower();
+            var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Intento de crear usuario con email existente: {Email}", createUserDto.Email);
+                throw new InvalidOperationException("El email ya está en uso");
+            }
+
+            // 2. Hashear la contraseña usando BCrypt
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(createUserDto.Password);
+
+            // 3. Crear una nueva entidad User con los datos del DTO usando AutoMapper
+            var user = _mapper.Map<User>(createUserDto);
+            user.Email = normalizedEmail; // Asegurar que el email se guarde normalizado
+            user.PasswordHash = passwordHash;
+            user.CreatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow; // Asignar fecha actual ya que la BD no permite NULL
+            user.LastTokenIssueAt = DateTime.UtcNow; // Asignar fecha actual ya que la BD no permite NULL
+            user.RoleId = 4; // Asignar rol "User without Team" por defecto
+
+            // 4. Guardar en la base de datos
+            var createdUser = await _unitOfWork.Users.AddAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Usuario creado exitosamente con ID: {UserId}", createdUser.UserId);
+
+            // 5. Mapear la entidad creada a UserDto y retornar
+            return _mapper.Map<UserDto>(createdUser);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al crear usuario con email: {Email}", createUserDto.Email);
+            throw;
+        }
+    }
     /// <summary>
     /// TODO: ESTUDIANTE - Implementar la actualización de un usuario
     /// 
