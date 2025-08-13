@@ -2,6 +2,7 @@ using DevWorkshop.TaskAPI.Application.Interfaces;
 using DevWorkshop.TaskAPI.Domain.Entities;
 using DevWorkshop.TaskAPI.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore;
 
 namespace DevWorkshop.TaskAPI.Infrastructure.Repositories;
 
@@ -54,6 +55,14 @@ public class UnitOfWork : IUnitOfWork
     public async Task<int> SaveChangesAsync()
     {
         return await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Ejecuta una consulta SQL directa
+    /// </summary>
+    public async Task<int> ExecuteSqlRawAsync(string sql, params object[] parameters)
+    {
+        return await _context.Database.ExecuteSqlRawAsync(sql, parameters);
     }
 
     /// <summary>

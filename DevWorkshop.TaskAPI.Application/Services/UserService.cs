@@ -4,6 +4,7 @@ using DevWorkshop.TaskAPI.Application.Interfaces;
 using DevWorkshop.TaskAPI.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using BCrypt.Net;
+using Microsoft.EntityFrameworkCore;
 
 namespace DevWorkshop.TaskAPI.Application.Services;
 
@@ -54,19 +55,30 @@ public class UserService : IUserService
         throw new NotImplementedException("Método pendiente de implementación por el estudiante");
     }
 
-    /// <summary>
-    /// TODO: ESTUDIANTE - Implementar la búsqueda de usuario por email
-    /// 
-    /// Pasos a seguir:
-    /// 1. Buscar el usuario en la base de datos por Email
-    /// 2. Verificar que el usuario existe y está activo
-    /// 3. Mapear la entidad a UserDto
-    /// 4. Retornar el usuario o null si no existe
-    /// </summary>
     public async Task<UserDto?> GetUserByEmailAsync(string email)
     {
-        // TODO: ESTUDIANTE - Implementar lógica
-        throw new NotImplementedException("Método pendiente de implementación por el estudiante");
+        try
+        {
+            _logger.LogInformation("Buscando usuario por email: {Email}", email);
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+            {
+                _logger.LogInformation("No se encontró usuario con email: {Email}", email);
+                return null;
+            }
+
+            var userDto = _mapper.Map<UserDto>(user);
+
+            _logger.LogInformation("Usuario encontrado con ID: {UserId}", user.UserId);
+            return userDto;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al buscar usuario por email: {Email}", email);
+            throw;
+        }
     }
 
     /// <summary>
@@ -157,17 +169,158 @@ public class UserService : IUserService
         throw new NotImplementedException("Método pendiente de implementación por el estudiante");
     }
 
-    /// <summary>
-    /// TODO: ESTUDIANTE - Implementar la verificación de email existente
-    /// 
-    /// Pasos a seguir:
-    /// 1. Buscar usuarios con el email especificado
-    /// 2. Si se proporciona excludeUserId, excluir ese usuario de la búsqueda
-    /// 3. Retornar true si existe algún usuario con ese email
-    /// </summary>
     public async Task<bool> EmailExistsAsync(string email, int? excludeUserId = null)
     {
-        // TODO: ESTUDIANTE - Implementar lógica
-        throw new NotImplementedException("Método pendiente de implementación por el estudiante");
+        try
+        {
+            _logger.LogInformation("Verificando si el email existe: {Email}", email);
+
+            var normalizedEmail = email.Trim().ToLower();
+
+            if (excludeUserId.HasValue)
+            {
+                var exists = await _unitOfWork.Users.AnyAsync(u =>
+                    u.Email.ToLower() == normalizedEmail && u.UserId != excludeUserId.Value);
+                _logger.LogInformation("Email {Email} existe (excluyendo UserId {ExcludeUserId}): {Exists}",
+                    email, excludeUserId.Value, exists);
+                return exists;
+            }
+            else
+            {
+                var exists = await _unitOfWork.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail);
+                _logger.LogInformation("Email {Email} existe: {Exists}", email, exists);
+                return exists;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al verificar si el email existe: {Email}", email);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene la entidad User completa por email
+    /// </summary>
+    public async Task<User?> GetUserEntityByEmailAsync(string email)
+    {
+        try
+        {
+            _logger.LogInformation("Buscando entidad User por email: {Email}", email);
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user != null)
+            {
+                _logger.LogInformation("Entidad User encontrada para email: {Email}", email);
+            }
+            else
+            {
+                _logger.LogInformation("No se encontró entidad User para email: {Email}", email);
+            }
+
+            return user;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al buscar entidad User por email: {Email}", email);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene la entidad User completa por ID
+    /// </summary>
+    public async Task<User?> GetUserEntityByIdAsync(int userId)
+    {
+        try
+        {
+            _logger.LogInformation("Buscando entidad User por ID: {UserId}", userId);
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+
+            if (user != null)
+            {
+                _logger.LogInformation("Entidad User encontrada para ID: {UserId}", userId);
+            }
+            else
+            {
+                _logger.LogInformation("No se encontró entidad User para ID: {UserId}", userId);
+            }
+
+            return user;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al buscar entidad User por ID: {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Actualiza una entidad User en la base de datos
+    /// </summary>
+    public async Task<bool> UpdateUserEntityAsync(User user)
+    {
+        try
+        {
+            _logger.LogInformation("Actualizando entidad User con ID: {UserId}", user.UserId);
+
+            // Estrategia alternativa para evitar problemas con triggers de SQL Server
+            // En lugar de usar Update, vamos a usar una actualización específica del campo LastTokenIssueAt
+            var existingUser = await _unitOfWork.Users.GetByIdAsync(user.UserId);
+            if (existingUser == null)
+            {
+                _logger.LogWarning("Usuario no encontrado para actualización: {UserId}", user.UserId);
+                return false;
+            }
+
+            // Solo actualizar el campo que necesitamos para el logout
+            existingUser.LastTokenIssueAt = user.LastTokenIssueAt;
+
+            // Usar Update pero con manejo específico para triggers
+            _unitOfWork.Users.Update(existingUser);
+
+            try
+            {
+                var result = await _unitOfWork.SaveChangesAsync();
+
+                if (result > 0)
+                {
+                    _logger.LogInformation("Entidad User actualizada exitosamente: {UserId}", user.UserId);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning("No se pudo actualizar la entidad User: {UserId}", user.UserId);
+                    return false;
+                }
+            }
+            catch (Exception saveEx) when (saveEx.Message.Contains("database triggers"))
+            {
+                _logger.LogWarning("Error con triggers detectado, intentando método alternativo para usuario: {UserId}", user.UserId);
+
+                // Método alternativo: usar ExecuteSqlRaw para evitar la cláusula OUTPUT
+                var sql = "UPDATE Users SET LastTokenIssueAt = {0} WHERE UserId = {1}";
+                var parameters = new object[] { user.LastTokenIssueAt ?? (object)DBNull.Value, user.UserId };
+                var rowsAffected = await _unitOfWork.ExecuteSqlRawAsync(sql, parameters);
+
+                if (rowsAffected > 0)
+                {
+                    _logger.LogInformation("Entidad User actualizada exitosamente usando SQL directo: {UserId}", user.UserId);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning("No se pudo actualizar la entidad User usando SQL directo: {UserId}", user.UserId);
+                    return false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al actualizar entidad User: {UserId}", user.UserId);
+            throw;
+        }
     }
 }

@@ -31,6 +31,14 @@ public interface IUnitOfWork : IDisposable
     Task<int> SaveChangesAsync();
 
     /// <summary>
+    /// Ejecuta una consulta SQL directa
+    /// </summary>
+    /// <param name="sql">Consulta SQL</param>
+    /// <param name="parameters">Parámetros de la consulta</param>
+    /// <returns>Número de filas afectadas</returns>
+    Task<int> ExecuteSqlRawAsync(string sql, params object[] parameters);
+
+    /// <summary>
     /// Inicia una nueva transacción
     /// </summary>
     Task BeginTransactionAsync();

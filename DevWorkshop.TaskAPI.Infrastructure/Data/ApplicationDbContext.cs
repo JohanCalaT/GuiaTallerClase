@@ -12,6 +12,8 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+
+
     /// <summary>
     /// Conjunto de entidades de usuarios
     /// </summary>
@@ -63,6 +65,8 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(e => e.LastTokenIssueAt)
                 .HasColumnType("datetime2(7)");
+
+
 
             // Relación con Role
             entity.HasOne(e => e.Role)
